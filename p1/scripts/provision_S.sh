@@ -1,20 +1,25 @@
 #!/bin/bash
 
-echo "[$(hostname)] Installing K3S on server. ====================>>>>>>>>>>>>>>>>>"
-# Installation de k3s sur la machine virtuelle "kthierryS" en mode contrôleur
-# Telechargement et installation de K3s
-curl -sfL https://get.k3s.io |
-sh -s - --write-kubeconfig-mode 644 \
-    --node-ip $SERVER_IP
-    
-# Boucle pour attendre la création du token par K3s
-while [ ! -f $K3S_TOKEN ]; do
-  sleep 1
-done
+GREEN="\033[32m"
+RED="\033[31m"
+RESET="\033[0m"
 
-# Copie du token K3s dans le dossier partage entre toutes les VMs
-sudo cp $K3S_TOKEN /$SYNCED_FOLDER
+echo "${GREEN}[INFO]  Installing k3s on server node (ip: $1) ===================>>>>>>>>//////${RESET}"
 
-echo "[$(hostname)] Configured succesfully ====================>>>>>>>>>>>>>>>>>"
+export INSTALL_K3S_EXEC="--write-kubeconfig-mode=644 --tls-san $(hostname) --node-ip $1  --bind-address=$1 --advertise-address=$1 "
 
+echo "${GREEN}[INFO]  ARGUMENT PASSED TO INSTALL_K3S_EXEC: $INSTALL_K3S_EXEC ===================>>>>>>>>//////${RESET}"
 
+apk add curl
+
+curl -sfL https://get.k3s.io |  sh -
+
+echo "${GREEN}[INFO]  Doing some sleep to wait for k3s to be ready ===================>>>>>>>>//////${RESET}"
+
+sleep 10
+
+sudo cp /var/lib/rancher/k3s/server/node-token /vagrant/scripts/
+
+echo "${GREEN}[INFO]  Successfully installed k3s on server node ===================>>>>>>>>//////${RESET}"
+
+echo "alias k='kubectl'" >> /etc/profile.d/00-aliases.sh
