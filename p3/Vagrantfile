@@ -1,0 +1,14 @@
+Vagrant.configure("2") do |config|
+    config.vm.box = "generic/alpine318" # Utilise une box Ubuntu 18.04
+    config.vm.hostname = "k3d-argocd-vm"
+    config.vm.network "private_network", type: "dhcp"
+  
+    config.vm.provider "virtualbox" do |vb|
+      vb.name = "k3d-argocd-vm"
+      vb.memory = "4096"
+      vb.cpus = 2
+    end
+  
+    config.vm.provision "shell", path: "install.sh", privileged: true
+  end
+  
