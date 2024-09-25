@@ -3,15 +3,20 @@ a finir:
 ```$> cat deployment.yaml | grep v1```
 
 - image: wil42/playground:v1
+
 ```$> curl http://localhost:8888/```
+
 {"status":"ok", "message": "v1"}
-ca a faire en gros
-et apres en gros pour montrer que ca fonctionne on doit faire 
+
 ```$>sed -i 's/wil42\/playground\:v1/wil42\/playground\:v2/g' deploy.yaml```
+
 ```$>g up "v2" # git add+commit+push```
+
 [..]
 a773f39..999b9fe master -> master
+
 ```$> cat deployment.yaml | grep v2```
+
 - image: wil42/playground:v2
 et donc si ca marche bien le push on devra faire ca 
 ```$> curl http://localhost:8888/```
