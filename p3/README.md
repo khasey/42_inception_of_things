@@ -18,10 +18,10 @@ a773f39..999b9fe master -> master
 ```$> cat deployment.yaml | grep v2```
 
 - image: wil42/playground:v2
-et donc si ca marche bien le push on devra faire ca 
+
 ```$> curl http://localhost:8888/```
+
 {"status":"ok", "message": "v2"}
-et si la reponse est bonne on a fini
 
 Résumé des exigences de l'exercice :
 
