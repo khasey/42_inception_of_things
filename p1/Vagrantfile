@@ -1,51 +1,45 @@
-VM_BOX_NAME = "generic/alpine318"
-
-SERVER_NAME = "kthierryS"
-AGENT_NAME = "kthierrySW"
-
-SERVER_IP = "192.168.56.110"
-WORKER_IP = "192.168.56.111"
-
-SYNCED_FOLDER = "/vagrant"
-K3S_TOKEN_PATH = "/var/lib/rancher/k3s/server/node-token"
-
-SERVER_SCRIPT_PATH = "./scripts/provision_S.sh"
-AGENT_SCRIPT_PATH = "./scripts/provision_SW.sh"
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
 
 Vagrant.configure("2") do |config|
-  config.vm.box = VM_BOX_NAME
-  config.vm.synced_folder ".", SYNCED_FOLDER
-  
-  # Configuration for the server (controller mode)
-  config.vm.define SERVER_NAME do |server|
-    server.vm.hostname = SERVER_NAME
-    server.vm.network "private_network", ip: SERVER_IP
-    server.vm.provider "virtualbox" do |vb|
-      vb.name = SERVER_NAME
-      vb.memory = "1024"
-      vb.cpus = 1
+
+  config.vm.box = "centos/8"
+  config.vm.box_url = "https://app.vagrantup.com/centos/boxes/8"
+
+  # Install net-tools for all machines  
+  config.vm.provision "shell", inline: <<-SHELL
+    # yum update -y
+    yum install -y net-tools
+  SHELL
+
+  config.vm.define "oouklichS" do |control|
+    control.vm.hostname = "oouklichS"
+    control.vm.network "private_network", ip: "192.168.42.110"
+    control.vm.provider "virtualbox" do |v|
+      v.customize ["modifyvm", :id, "--name", "oouklichS"]
+      v.customize ["modifyvm", :id, "--natdnsproxy1", "on"]
+      v.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
+      v.memory = 512
+      v.cpus = 1
     end
-    # server.vm.provision "shell", privileged: true, path: SERVER_SCRIPT_PATH, env: {
-    #   "K3S_TOKEN_PATH" => K3S_TOKEN_PATH,
-    #   "SYNCED_FOLDER" => SYNCED_FOLDER
-    # }
-    server.vm.provision "shell", privileged: true, path: SERVER_SCRIPT_PATH, args: [SERVER_IP]
+    control.vm.provision "file", source: "~/.ssh/id_rsa.pub", destination: "/tmp/id_rsa.pub"
+    control.vm.provision "file", source: "~/.ssh/id_rsa", destination: "/tmp/id_rsa"
+    control.vm.provision "shell", privileged: true, path: "scripts/installS.sh"
+  end
+  
+  config.vm.define "oouklichSW" do |control|
+    control.vm.hostname = "oouklichSW"
+    control.vm.network "private_network", ip: "192.168.42.111"
+    control.vm.provider "virtualbox" do |v|
+      v.customize ["modifyvm", :id, "--name", "oouklichSW"]
+      v.customize ["modifyvm", :id, "--natdnsproxy1", "on"]
+      v.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
+      v.memory = 512
+      v.cpus = 1
+    end
+    control.vm.provision "file", source: "~/.ssh/id_rsa.pub", destination: "/tmp/id_rsa.pub"
+    control.vm.provision "file", source: "~/.ssh/id_rsa", destination: "/tmp/id_rsa"
+    control.vm.provision "shell", privileged: true, path: "scripts/installSW.sh"
   end
 
-  # Configuration for the agent (worker mode)
-  config.vm.define AGENT_NAME do |agent|
-    agent.vm.hostname = AGENT_NAME
-    agent.vm.network "private_network", ip: WORKER_IP
-    agent.vm.provider "virtualbox" do |vb|
-      vb.name = AGENT_NAME
-      vb.memory = "1024"
-      vb.cpus = 1
-    end
-    # agent.vm.provision "shell", privileged: true, path: AGENT_SCRIPT_PATH, env: {
-    #   "SERVER_IP" => SERVER_IP,
-    #   "K3S_TOKEN_PATH" => K3S_TOKEN_PATH,
-    #   "SYNCED_FOLDER" => SYNCED_FOLDER
-    # }
-    agent.vm.provision "shell", privileged: true, path: AGENT_SCRIPT_PATH, args: [SERVER_IP, WORKER_IP]
-  end
 end

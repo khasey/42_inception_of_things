@@ -1,25 +1,26 @@
-VM_BOX_NAME = "generic/alpine318"
-SERVER_NAME = "nbechardS"
-SERVER_IP = "192.168.56.110"
-SYNCED_FOLDER = "/vagrant"
-SERVER_SCRIPT_PATH = "./scripts/provision_S.sh"
-APP_YAML_FOLDER = "./scripts/kubernetes_manifests"
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
 
 Vagrant.configure("2") do |config|
-  config.vm.box = VM_BOX_NAME
-  config.vm.synced_folder ".", SYNCED_FOLDER
-  config.vm.synced_folder "/home/kthierry/Desktop/Inception-of-Things/42_inception_of_things/p2/scripts/kubernetes_manifests", "/vagrant/kubernetes_manifests"
 
-  config.vm.define SERVER_NAME do |server|
-    server.vm.hostname = SERVER_NAME
-    server.vm.network "private_network", ip: SERVER_IP
-    server.vm.provider "virtualbox" do |vb|
-      vb.name = SERVER_NAME
-      vb.memory = "1024"
-      vb.cpus = 1
-    end
+  config.vm.box = "centos/8"
 
-    # Installation de K3s et application des fichiers YAML
-    server.vm.provision "shell", privileged: true, path: SERVER_SCRIPT_PATH, args: [SERVER_IP]
+  config.vm.provision "shell", inline: <<-SHELL
+    yum install -y net-tools
+  SHELL
+
+  config.vm.define "erahimiS"
+  config.vm.hostname = "erahimiS"
+  config.vm.network "private_network", ip: "192.168.42.110"
+  config.vm.provision "file", source: "confs/deployment.yaml", destination: "/tmp/deployment.yaml"
+  config.vm.provision "file", source: "confs/app1", destination: "/tmp/app1"
+  config.vm.provision "file", source: "confs/app2", destination: "/tmp/app2"
+  config.vm.provision "file", source: "confs/app3", destination: "/tmp/app3"
+  config.vm.provider "virtualbox" do |v|
+    v.name = "erahimiS"
+    v.memory = 1024
+    v.cpus = 1
   end
+  config.vm.provision "shell", privileged: true, path: "scripts/install.sh"
+
 end
