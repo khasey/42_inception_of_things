@@ -1,5 +1,6 @@
 a finir:
 ```$> cat deployment.yaml | grep v1```
+
 - image: wil42/playground:v1
 ```$> curl http://localhost:8888/```
 {"status":"ok", "message": "v1"}
