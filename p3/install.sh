@@ -1,8 +1,14 @@
 #!/bin/bash
 
-GREEN="\033[32m"
-RED="\033[31m"
-RESET="\033[0m"
+set -e
+
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+RESET='\033[0m'
+
+# Récupération du nom d'utilisateur depuis les arguments
+USER_NAME="$1"
+USER_HOME="/home/$USER_NAME"
 
 echo -e "${GREEN}[INFO]  Mise à jour et installation des dépendances ===================>>>>>>>>//////${RESET}"
 
@@ -17,7 +23,8 @@ apk add --no-cache \
     ip6tables \
     ca-certificates \
     gnupg \
-    lsb-release
+    lsb-release \
+    shadow # Pour usermod
 
 echo -e "${GREEN}[INFO]  Installation de Docker ===================>>>>>>>>//////${RESET}"
 
@@ -25,7 +32,9 @@ echo -e "${GREEN}[INFO]  Installation de Docker ===================>>>>>>>>/////
 apk add --no-cache docker
 rc-update add docker boot
 service docker start
-addgroup vagrant docker
+
+# Ajout de l'utilisateur au groupe docker
+usermod -aG docker $USER_NAME
 
 echo -e "${GREEN}[INFO]  Installation de K3d ===================>>>>>>>>//////${RESET}"
 
@@ -35,7 +44,7 @@ curl -s https://raw.githubusercontent.com/rancher/k3d/main/install.sh | bash
 echo -e "${GREEN}[INFO]  Installation de kubectl ===================>>>>>>>>//////${RESET}"
 
 # Installation de kubectl
-curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+curl -LO "https://dl.k8s.io/release/$(curl -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
 chmod +x kubectl
 mv kubectl /usr/local/bin/
 
@@ -44,65 +53,87 @@ echo -e "${GREEN}[INFO]  Création du cluster K3d ===================>>>>>>>>///
 # Création du cluster K3d
 k3d cluster create mycluster --api-port 6550 --port 8080:80@loadbalancer
 
+echo -e "${GREEN}[INFO]  Configuration du kubeconfig pour l'utilisateur $USER_NAME ===================>>>>>>>>//////${RESET}"
+
+# Copier le kubeconfig pour l'utilisateur
+mkdir -p $USER_HOME/.kube
+k3d kubeconfig get mycluster > $USER_HOME/.kube/config
+chown -R $USER_NAME:$USER_NAME $USER_HOME/.kube
+
+# Exporter la variable KUBECONFIG pour le reste du script
+export KUBECONFIG=/root/.kube/config
+
 echo -e "${GREEN}[INFO]  Installation de Argo CD ===================>>>>>>>>//////${RESET}"
 
-# Installation de Argo CD
+# Création des namespaces
 kubectl create namespace argocd
+kubectl create namespace dev
+
+# Installation de Argo CD dans le namespace argocd
 kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 
 echo -e "${GREEN}[INFO]  Attente de la disponibilité de Argo CD ===================>>>>>>>>//////${RESET}"
 
-# Attente de la disponibilité de Argo CD
+# Attente que le déploiement argocd-server soit prêt
 kubectl rollout status -n argocd deployment/argocd-server
 
-echo -e "${GREEN}[INFO]  Création du namespace 'dev' ===================>>>>>>>>//////${RESET}"
+echo -e "${GREEN}[INFO]  Attente que les CRDs d'Argo CD soient disponibles ===================>>>>>>>>//////${RESET}"
 
-# Création du namespace 'dev'
-kubectl create namespace dev
+# Attendre que les CRDs soient disponibles
+until kubectl get crd applications.argoproj.io > /dev/null 2>&1; do
+  echo "Waiting for Argo CD CRDs to be ready..."
+  sleep 5
+done
 
-echo -e "${GREEN}[INFO]  Déploiement de l'application de Wil ===================>>>>>>>>//////${RESET}"
+echo -e "${GREEN}[INFO]  Application des configurations Argo CD ===================>>>>>>>>//////${RESET}"
 
-# Déploiement de l'application de Wil
-cat <<EOF | kubectl apply -n dev -f -
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: wil-playground
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: wil-playground
-  template:
-    metadata:
-      labels:
-        app: wil-playground
-    spec:
-      containers:
-      - name: wil-playground
-        image: wil42/playground:v1
-        ports:
-        - containerPort: 8888
-EOF
+# Appliquer le projet Argo CD dans le namespace argocd
+if kubectl apply -n argocd -f /tmp/project.yaml; then
+  echo "Project applied successfully."
+else
+  echo -e "${RED}[ERROR] Échec de l'application du projet.${RESET}"
+  exit 1
+fi
 
-# Création du service pour l'application
-cat <<EOF | kubectl apply -n dev -f -
-apiVersion: v1
-kind: Service
-metadata:
-  name: wil-playground
-spec:
-  selector:
-    app: wil-playground
-  ports:
-    - protocol: TCP
-      port: 80
-      targetPort: 8888
-EOF
+# Appliquer l'application Argo CD dans le namespace argocd
+if kubectl apply -n argocd -f /tmp/application.yaml; then
+  echo "Application applied successfully."
+else
+  echo -e "${RED}[ERROR] Échec de l'application de l'application Argo CD.${RESET}"
+  exit 1
+fi
+
+echo -e "${GREEN}[INFO]  Attente de la synchronisation de l'application 'argocd-iot-app' ===================>>>>>>>>//////${RESET}"
+
+# Attendre que l'application soit synchronisée et saine
+TIMEOUT=600
+INTERVAL=10
+ELAPSED=0
+while true; do
+  if kubectl get application argocd-iot-app -n argocd > /dev/null 2>&1; then
+    SYNC_STATUS=$(kubectl get application argocd-iot-app -n argocd -o jsonpath='{.status.sync.status}')
+    HEALTH_STATUS=$(kubectl get application argocd-iot-app -n argocd -o jsonpath='{.status.health.status}')
+    if [[ "$SYNC_STATUS" == "Synced" && "$HEALTH_STATUS" == "Healthy" ]]; then
+      echo "Application is synced and healthy."
+      break
+    else
+      echo "Application status: Sync=$SYNC_STATUS, Health=$HEALTH_STATUS"
+    fi
+  else
+    echo "Application 'argocd-iot-app' not found yet."
+  fi
+  if [ $ELAPSED -ge $TIMEOUT ]; then
+    echo -e "${RED}[ERROR] Timeout waiting for application to be synced and healthy.${RESET}"
+    exit 1
+  fi
+  echo "Waiting for application to be synced and healthy..."
+  sleep $INTERVAL
+  ELAPSED=$((ELAPSED + INTERVAL))
+done
 
 echo -e "${GREEN}[INFO]  Vérification du déploiement de l'application ===================>>>>>>>>//////${RESET}"
 
-# Attendre que le pod soit prêt
-kubectl rollout status -n dev deployment/wil-playground
+# Attendre que le déploiement 'wil-playground' soit prêt dans le namespace 'dev'
+kubectl rollout status -n dev deployment/wil-playground --timeout=600s
 
 echo -e "${GREEN}[INFO]  Script terminé avec succès ===================>>>>>>>>//////${RESET}"
