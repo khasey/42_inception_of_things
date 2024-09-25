@@ -1,6 +1,5 @@
-#!/bin/sh
+#!/bin/bash
 
-# Colors for output
 GREEN="\033[32m"
 RED="\033[31m"
 RESET="\033[0m"
@@ -60,5 +59,50 @@ echo -e "${GREEN}[INFO]  Création du namespace 'dev' ===================>>>>>>>
 
 # Création du namespace 'dev'
 kubectl create namespace dev
+
+echo -e "${GREEN}[INFO]  Déploiement de l'application de Wil ===================>>>>>>>>//////${RESET}"
+
+# Déploiement de l'application de Wil
+cat <<EOF | kubectl apply -n dev -f -
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wil-playground
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: wil-playground
+  template:
+    metadata:
+      labels:
+        app: wil-playground
+    spec:
+      containers:
+      - name: wil-playground
+        image: wil42/playground:v1
+        ports:
+        - containerPort: 8888
+EOF
+
+# Création du service pour l'application
+cat <<EOF | kubectl apply -n dev -f -
+apiVersion: v1
+kind: Service
+metadata:
+  name: wil-playground
+spec:
+  selector:
+    app: wil-playground
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8888
+EOF
+
+echo -e "${GREEN}[INFO]  Vérification du déploiement de l'application ===================>>>>>>>>//////${RESET}"
+
+# Attendre que le pod soit prêt
+kubectl rollout status -n dev deployment/wil-playground
 
 echo -e "${GREEN}[INFO]  Script terminé avec succès ===================>>>>>>>>//////${RESET}"
