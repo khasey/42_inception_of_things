@@ -53,7 +53,7 @@ mv kubectl /usr/local/bin/
 echo -e "${GREEN}[INFO]  Création du cluster K3d ===================>>>>>>>>//////${RESET}"
 
 # Création du cluster K3d
-k3d cluster create mycluster --api-port 6550 --port 8080:80@loadbalancer
+k3d cluster create mycluster --api-port 6550 --port 8080:8888@loadbalancer
 
 echo -e "${GREEN}[INFO]  Configuration du kubeconfig pour l'utilisateur $USER_NAME ===================>>>>>>>>//////${RESET}"
 
