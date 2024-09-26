@@ -1,0 +1,12 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: development
+  namespace: argocd
+spec:
+  description: Projet Argo CD pour l'application
+  sourceRepos:
+    - "https://github.com/khasey/*"
+  destinations:
+    - namespace: dev
+      server: https://kubernetes.default.svc
