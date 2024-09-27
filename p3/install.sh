@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e
+# set -e
 
 GREEN='\033[0;32m'
 RED='\033[0;31m'
@@ -13,18 +13,33 @@ USER_HOME="/home/$USER_NAME"
 echo -e "${GREEN}[INFO]  Mise à jour et installation des dépendances ===================>>>>>>>>//////${RESET}"
 
 # Mise à jour de la liste des paquets et installation des dépendances
+# apk update
+# apk add --no-cache \
+#     curl \
+#     bash \
+#     sudo \
+#     openrc \
+#     iptables \
+#     ip6tables \
+#     ca-certificates \
+#     gnupg \
+#     lsb-release \
+#     shadow # Pour usermod
+
+# Mise à jour de la liste des paquets
 apk update
-apk add --no-cache \
-    curl \
-    bash \
-    sudo \
-    openrc \
-    iptables \
-    ip6tables \
-    ca-certificates \
-    gnupg \
-    lsb-release \
-    shadow # Pour usermod
+
+# Installation des outils de base
+apk add --no-cache curl bash sudo
+
+# Installation des outils de gestion des iptables et certificats
+apk add --no-cache iptables ip6tables ca-certificates
+
+# Installation de gnupg et lsb-release
+apk add --no-cache gnupg lsb-release
+
+# Installation de shadow pour usermod
+apk add --no-cache shadow
 
 echo -e "${GREEN}[INFO]  Installation de Docker ===================>>>>>>>>//////${RESET}"
 
@@ -112,8 +127,8 @@ fi
 echo -e "${GREEN}[INFO]  Attente de la synchronisation de l'application 'argocd-iot-app' ===================>>>>>>>>//////${RESET}"
 
 # Attendre que l'application soit synchronisée et saine
-TIMEOUT=60
-INTERVAL=5
+TIMEOUT=100
+INTERVAL=3
 ELAPSED=0
 while true; do
   if kubectl get application argocd-iot-app -n argocd > /dev/null 2>&1; then
