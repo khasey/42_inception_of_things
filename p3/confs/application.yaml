@@ -6,7 +6,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/Alrusso42/iot.git
+    repoURL: https://github.com/khasey/iot.git
     targetRevision: HEAD
     path: manifests
 
